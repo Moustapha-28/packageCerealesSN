@@ -1,0 +1,1307 @@
+chemin <- "C:/Users/moust/Downloads/data/data"
+
+
+  #rm(list = ls())
+  #gc()
+
+
+  # Chargement des packages nécessaires
+  library(haven)
+  library(tidyverse)
+  library(dplyr)
+  library(ggplot2)
+  library(readxl)
+  library(labelled)
+
+
+  # ---------------------------------------------------------------------------------------------
+  # Chargement des bases
+  cereales <- read_dta(paste0(chemin, "/cereales.dta"))
+  S00_S01_membres <- read_dta(paste0(chemin, "/S00_S01_membres.dta"))
+  Ehcvm_all <- read_dta(paste0(chemin, "/Ehcvm_all.dta"))
+  calorie_conversion_tgo2021 <- read_dta(paste0(chemin, "/calorie_conversion_tgo2021.dta"))
+  TableConversionP2 <- read_xlsx(paste0(chemin, "/TableConversionP2.xlsx"))
+
+
+  # ---------------------------------------------------------------------------------------------
+  ### 1.1 Réflexes du Statisticien
+
+  # Dimensions de la base
+  glimpse(cereales)
+  view(cereales)
+  anyDuplicated(cereales)
+  dim(cereales)
+
+
+  # Aperçu des identifiants
+  summary(cereales$interview__key)
+  summary(cereales$interview__id)
+
+  # Renommage des colonnes pour plus de lisibilité
+  colnames(cereales) <- c(
+    "menage_id","interview_id", "produit", "autre_produit",
+    "qte_consommee", "unite_cons", "taille_cons", "qte_autoconsommation",
+    "qte_dons_troc", "dernier_achat", "qte_achat",
+    "unite_achat", "taille_achat", "val_achat"
+  )
+
+  # Labellisation des variables
+  var_label(cereales$menage_id)           <- "Identifiant du ménage"
+  var_label(cereales$produit)             <- "Nom du produit céréalier"
+  var_label(cereales$autre_produit)       <- "Nom de la céréale si 'Autres' est sélectionné"
+  var_label(cereales$qte_consommee)       <- "Quantité totale consommée durant les 7 derniers jours"
+  var_label(cereales$unite_cons)          <- "Unité dans laquelle la consommation a été déclarée"
+  var_label(cereales$taille_cons)         <- "Taille de l’unité de consommation déclarée"
+  var_label(cereales$qte_autoconsommation)<- "Quantité issue de la production propre"
+  var_label(cereales$qte_dons_troc)       <- "Quantité obtenue via dons, commerce, troc, etc."
+  var_label(cereales$dernier_achat) <- "Période du dernier achat de cette céréale"
+  var_label(cereales$qte_achat)           <- "Quantité achetée la dernière fois"
+  var_label(cereales$unite_achat)         <- "Unité utilisée pour l’achat"
+  var_label(cereales$taille_achat)        <- "Taille de l’unité d’achat"
+  var_label(cereales$val_achat)           <- "Valeur monétaire de l’achat (FCFA)"
+
+  # Labellisation des modalités
+  cereales$produit <- set_value_labels(cereales$produit, values = c(
+    "Riz local brisé" = 1,
+    "Riz local entier" = 2,
+    "Riz importé brisé" = 3,
+    "Riz importé entier" = 4,
+    "Maïs en épi" = 5,
+    "Maïs en grain" = 6,
+    "Mil" = 7,
+    "Sorgho" = 8,
+    "Blé" = 9,
+    "Fonio" = 10,
+    "Autres céréales" = 11,
+    "Farine de maïs" = 12,
+    "semoule de mais" = 13,
+    "Farine de mil" = 14,
+    "semoule de mil" = 15,
+    "Farine de blé local ou importé" = 16,
+    "semoule de blé" = 17,
+    "Autres farines de céréales" = 18,
+    "Autres semoules de céréales" = 19,
+    "Pâtes alimentaires" = 20,
+    "Pain moderne" = 21,
+    "Pain traditionnel" = 22,
+    "Croissants" = 23,
+    "Biscuits" = 24,
+    "Gâteaux" = 25,
+    "Beignets, galettes" = 26,
+    "Céréales de petit déjeuner" = 169
+  ))
+
+
+  cereales$unite_cons <- set_value_labels(cereales$unite_cons, values = c(
+    "Kg" = 100,
+    "Boite de tomate" = 108,
+    "Bol" = 109,
+    "Calebasse" = 115,
+    "Cup gobelet" = 123,
+    "Louche traditionnelle" = 125,
+    "Morceau" = 126,
+    "Paquet" = 129,
+    "Sac (100 Kg)" = 135,
+    "Sac (25 Kg)" = 136,
+    "Sac (5 Kg)" = 137,
+    "Sac (50 Kg)" = 138,
+    "Sachet" = 139,
+    "Tas" = 143,
+    "Tine" = 145,
+    "Unité" = 147,
+    "Yorouba" = 149,
+    "Quart-Yorouba" = 251,
+    "Demi-Yorouba" = 252,
+    "Cornet" = 562,
+    "Cuillère à soupe" = 564,
+    "miche" = 568,
+    "Démi-miche" = 569,
+    "Tiers de miche" = 570,
+    "Quart de miche" = 571
+  ))
+
+
+
+  cereales$taille_cons <- set_value_labels(cereales$taille_cons, values = c(
+    "Taille unique" = 0,
+    "Petit" = 1,
+    "Moyen" = 2,
+    "Grand" = 3,
+    "Quart" = 4,
+    "Demi" = 5,
+    "Entier" = 6,
+    "Très Petite" = 7
+  ))
+
+
+
+  cereales$dernier_achat <- set_value_labels(cereales$dernier_achat, values = c(
+    "Hier" = 1,
+    "7 dernier jours" = 2,
+    "30 derniers jours" = 3,
+    "Plus de 30 jours" = 4,
+    "Jamais" = 5
+  ))
+
+
+
+  cereales$unite_achat <- set_value_labels(cereales$unite_achat, values = c(
+    "Kg" = 100,
+    "Boite de tomate" = 108,
+    "Bol" = 109,
+    "Calebasse" = 115,
+    "Cup gobelet" = 123,
+    "Louche traditionnelle" = 125,
+    "Morceau" = 126,
+    "Paquet" = 129,
+    "Sac (100 Kg)" = 135,
+    "Sac (25 Kg)" = 136,
+    "Sac (5 Kg)" = 137,
+    "Sac (50 Kg)" = 138,
+    "Sachet" = 139,
+    "Tas" = 143,
+    "Tine" = 145,
+    "Unité" = 147,
+    "Yorouba" = 149,
+    "Quart-Yorouba" = 251,
+    "Demi-Yorouba" = 252,
+    "Cornet" = 562,
+    "Cuillère à soupe" = 564,
+    "miche" = 568,
+    "Démi-miche" = 569,
+    "Tiers de miche" = 570,
+    "Quart de miche" = 571
+  ))
+
+
+
+  cereales$taille_achat <- set_value_labels(cereales$taille_achat, values = c(
+    "Taille unique" = 0,
+    "Petit" = 1,
+    "Moyen" = 2,
+    "Grand" = 3,
+    "Quart" = 4,
+    "Demi" = 5,
+    "Entier" = 6
+  ))
+
+
+  # Vérification de la cohérence interne à partir du questionnaire
+
+  verifications <- list()
+
+
+  # Déclaration complète et cohérente
+
+  verifications[["declaration_incomplete"]] <- cereales %>%
+    filter(!is.na(produit) &
+             is.na(qte_consommee) &
+             is.na(qte_autoconsommation) &
+             is.na(qte_dons_troc))
+
+  # Consistance des quantités
+
+  verifications[["quantites_incoherentes"]] <- cereales %>%
+    filter(
+      (!is.na(qte_consommee) & !is.na(qte_autoconsommation) & !is.na(qte_dons_troc) &
+         (qte_autoconsommation + qte_dons_troc) > qte_consommee) |
+        (!is.na(qte_achat) & qte_achat > 0 & (is.na(val_achat) | val_achat == 0)) |
+        (!is.na(val_achat) & val_achat > 0 & (is.na(qte_achat) | qte_achat == 0))
+    )
+
+  # Logique temporelle de l’achat
+
+  verifications[["achat_incoherent"]] <- cereales %>%
+    filter((dernier_achat %in% 1:3 & (is.na(qte_achat) | qte_achat == 0)) |
+             (dernier_achat == 5 & !is.na(qte_achat) & qte_achat > 0))
+
+
+  # Structure logique des formats (unités et tailles)
+
+  verifications[["formats_incoherents"]] <- cereales %>%
+    filter((unite_cons == 100 & !is.na(taille_cons) & taille_cons != 0) |
+             (is.na(unite_cons) & !is.na(taille_cons)) |
+             (!is.na(unite_cons) & is.na(taille_cons)))
+
+
+  # Multiples déclarations pour un même ménage / produit
+
+  verifications[["produit_duplique"]] <- cereales %>%
+    group_by(menage_id, produit) %>%
+    filter(n() > 1) %>%
+    ungroup()
+
+
+  # Résumé
+
+  cat(" RÉSUMÉ DES INCOHÉRENCES (Formulation générale) :\n\n")
+  for (nom in names(verifications)) {
+    cat("- ", nom, ":", nrow(verifications[[nom]]), "lignes\n")
+  }
+
+
+  unique(verifications[["declaration_incomplete"]][["menage_id"]])        ## 11 ménages
+
+  nb_menages_cereales <- n_distinct(cereales$menage_id)
+  cat("Nombre de ménages dans la base : ", nb_menages_cereales, "\n")
+
+
+
+  # ---------------------------------------------------------------------------------------------
+  ### 1.2 Analyse Préliminaire des Données
+
+  ##  1. Examiner les quantités consommées
+
+  # Analyse globale de la variable brute
+
+  summary(cereales$qte_consommee)
+  sum(is.na(cereales$qte_consommee))
+  sum(cereales$qte_consommee == 0, na.rm = TRUE)
+
+
+  cereales <- cereales %>%
+    mutate(produit_label = to_factor(produit)) %>%
+    mutate(produit_label = reorder(produit_label, qte_consommee, FUN = median, na.rm = TRUE))
+  levels(cereales$produit_label) <- gsub("^values\\.", "", levels(cereales$produit_label))
+
+  boxplot(qte_consommee ~ produit_label,
+          data = cereales,
+          main = "Quantité consommée selon le produit",
+          xlab = "Produit céréalier",
+          ylab = "Quantité consommée",
+          col = "lightblue",
+          las = 2,
+          cex.axis = 0.8)
+
+  cereales$produit_label <- NULL
+
+  cereales <- cereales %>%
+    mutate(unite_label = to_factor(unite_cons)) %>%                                 # transformer en facteur
+    mutate(unite_label = reorder(unite_label, qte_consommee, FUN = median, na.rm = TRUE))  # réordonner
+
+  levels(cereales$unite_label) <- gsub("^values\\.", "", levels(cereales$unite_label))
+
+  boxplot(qte_consommee ~ unite_label,
+          data = cereales,
+          main = "Quantité consommée selon l'unité",
+          xlab = "Unité",
+          ylab = "Quantité consommée",
+          col = "lightblue",
+          las = 2,
+          cex.axis = 0.8)
+
+
+  cereales$unite_label <- NULL
+
+
+  # Vérification du couplage unité/taille
+
+  table(cereales$unite_cons, cereales$taille_cons, useNA = "ifany")
+
+  # Analyse des formats dominants
+
+  library(dplyr)
+
+  cereales %>%
+    group_by(unite_cons, taille_cons, produit) %>%
+    summarise(
+      moy = mean(qte_consommee, na.rm = TRUE),
+      med = median(qte_consommee, na.rm = TRUE),
+      n = n()
+    ) %>%
+    arrange(desc(n))
+
+  # Analyse des cas « propres » (unités homogènes uniquement)
+
+  # Sous-échantillon 1 : Pain moderne - miche - grand
+  pain_mod <- cereales %>%
+    filter(produit == 21, unite_cons == 568, taille_cons == 3)
+  summary(pain_mod$qte_consommee)
+
+  boxplot(pain_mod$qte_consommee,
+          main = "Pain moderne - miche - grand",
+          ylab = "Quantité consommée",
+          col = "lightblue")
+
+
+
+  # Sous-échantillon 2 : Riz local brisé - Kg - taille unique
+  riz_local <- cereales %>%
+    filter(produit == 1, unite_cons == 100, taille_cons == 0)
+  summary(riz_local$qte_consommee)
+
+  boxplot(riz_local$qte_consommee,
+          main = "Riz local brisé - Kg - taille unique",
+          ylab = "Quantité consommée",
+          col = "lightgreen")
+
+
+  # Sous-échantillon 3 : Mil - Kg - taille unique
+  mil <- cereales %>%
+    filter(produit == 7, unite_cons == 100, taille_cons == 0)
+  summary(mil$qte_consommee)
+
+  boxplot(mil$qte_consommee,
+          main = "Mil - Kg - taille unique",
+          ylab = "Quantité consommée",
+          col = "wheat")
+
+
+
+  ##   2. Analyser les quantités et valeurs achetées
+
+  # Cas "achat il y a plus de 30 jours"
+  achat_30j <- cereales %>% filter(dernier_achat == 4)
+
+  # Statistiques sur la complétude
+  nb_total <- nrow(achat_30j)
+  nb_qte_na <- sum(is.na(achat_30j$qte_achat))
+  nb_val_na <- sum(is.na(achat_30j$val_achat))
+  nb_qte_zero <- sum(achat_30j$qte_achat == 0, na.rm = TRUE)
+  nb_val_zero <- sum(achat_30j$val_achat == 0, na.rm = TRUE)
+  nb_complets <- sum(!is.na(achat_30j$qte_achat) & achat_30j$qte_achat > 0 &
+                       !is.na(achat_30j$val_achat) & achat_30j$val_achat > 0)
+
+  # Résumé
+  cat(" Cas avec dernier_achat == 4 (Plus de 30 jours) :\n")
+  cat("- Total :", nb_total, "lignes\n")
+  cat("- Quantité NA :", nb_qte_na, "\n")
+  cat("- Valeur NA :", nb_val_na, "\n")
+  cat("- Quantité = 0 :", nb_qte_zero, "\n")
+  cat("- Valeur = 0 :", nb_val_zero, "\n")
+  cat("- Complètement renseignés :", nb_complets, "\n")
+
+
+  # on retient ici les achat valide
+
+  achat_valide <- cereales %>%
+    filter(dernier_achat %in% 1:3,
+           !is.na(qte_achat), qte_achat > 0,
+           !is.na(val_achat), val_achat > 0)
+
+
+  #  Résumé global des quantités et valeurs
+
+  summary(achat_valide$qte_achat)
+  summary(achat_valide$val_achat)
+
+
+  # Hétérogénéité des quantités achetées par format
+
+  library(dplyr)
+
+  resume_qte <- achat_valide %>%
+    group_by(unite_achat, taille_achat, produit) %>%
+    summarise(
+      moy_qte = mean(qte_achat, na.rm = TRUE),
+      med_qte = median(qte_achat, na.rm = TRUE),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(n))
+
+  head(resume_qte, 10)  # les 10 formats les plus fréquents
+
+  achat_valide <- achat_valide %>%
+    mutate(unite_achat_label = to_factor(unite_achat)) %>%                                 # transformer en facteur
+    mutate(unite_achat_label = reorder(unite_achat_label, qte_consommee, FUN = median, na.rm = TRUE))  # réordonner
+
+  levels(achat_valide$unite_achat_label) <- gsub("^values\\.", "", levels(achat_valide$unite_achat_label))
+
+
+  boxplot(qte_achat ~ unite_achat_label,
+          data = achat_valide,
+          main = "Quantité achetée par unité déclarée",
+          xlab = "Code unité",
+          ylab = "Quantité",
+          col = "lightgreen",
+          las = 2)
+
+
+
+  # Analyse directe des valeurs d’achat (homogène en FCFA)
+
+  resume_val <- achat_valide %>%
+    group_by(produit) %>%
+    summarise(
+      moy_val = mean(val_achat, na.rm = TRUE),
+      med_val = median(val_achat, na.rm = TRUE),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(n))
+
+  head(resume_val, 10)
+
+
+  hist(achat_valide$val_achat, breaks = 40, col = "skyblue",
+       main = "Distribution des valeurs d’achat",
+       xlab = "Montant (FCFA)")
+
+  boxplot(achat_valide$val_achat,
+          main = "Valeur d’achat (FCFA)",
+          ylab = "Montant", col = "orange")
+
+
+
+  top3 <- resume_qte %>% slice_head(n = 3)
+
+
+  achat_valide$produit_label <- as_factor(achat_valide$produit)
+  levels(achat_valide$produit_label) <- gsub("^values\\.", "", levels(achat_valide$produit_label))
+
+  for (i in 1:3) {
+    ligne <- top3[i, ]
+
+    sous_ensemble <- achat_valide %>%
+      filter(unite_achat == ligne$unite_achat,
+             taille_achat == ligne$taille_achat,
+             produit == ligne$produit)
+
+    nom_produit <- unique(sous_ensemble$produit_label)
+
+    if (nrow(sous_ensemble) > 0 && length(nom_produit) == 1) {
+      boxplot(sous_ensemble$qte_achat,
+              main = paste0("Quantité achetée – ", nom_produit),
+              ylab = "Quantité", col = "lightblue")
+
+      boxplot(sous_ensemble$val_achat,
+              main = paste0("Valeur achetée – ", nom_produit),
+              ylab = "FCFA", col = "salmon")
+    }
+  }
+
+
+
+  ls()
+  rm(list = setdiff(ls(), c(
+    "chemin",
+    "cereales",
+    "S00_S01_membres",
+    "Ehcvm_all",
+    "calorie_conversion_tgo2021",
+    "TableConversionP2",
+    "verifications"
+  )))
+
+
+
+
+  ## 3. Calculer les valeurs unitaires : VU = Prix d’achat / Quantité achetée
+
+  # Nombre de formats jamais achetés ou avec info manquante
+  formats_statut <- cereales %>%
+    group_by(produit, unite_cons, taille_cons) %>%
+    summarise(
+      nb_total = n(),
+      nb_achetes = sum(dernier_achat %in% 1:4, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # 2. Filtrer ceux qui n'ont JAMAIS été achetés (nb_achetes == 0)
+  formats_jamais_achetes <- formats_statut %>%
+    filter(nb_achetes == 0)
+
+  # Affichage
+  print(formats_jamais_achetes)
+
+
+  cereales <- cereales %>%
+    mutate(
+      vu = ifelse(
+        !is.na(dernier_achat) & dernier_achat %in% 1:3 &
+          !is.na(qte_achat) & qte_achat > 0 &
+          !is.na(val_achat) & val_achat > 0,
+        val_achat / qte_achat,
+        NA_real_
+      )
+    )
+
+
+
+  ##  4. Examiner en profondeur les valeurs unitaires obtenues : mode, median, mean
+
+  resumer_variable <- function(var) {
+    cat("Résumé de", deparse(substitute(var)), ":\n")
+    print(summary(var))
+    cat("Écart-type :", sd(var, na.rm = TRUE), "\n")
+    cat("Nombre de NA :", sum(is.na(var)), "\n\n")
+  }
+
+  zoom_range <- function(x, lower = 0.01, upper = 0.99) {
+    quantile(x, probs = c(lower, upper), na.rm = TRUE)
+  }
+
+  visualiser_distribution <- function(var, titre = "") {
+    df <- data.frame(var = var)
+    list(
+      histogramme = ggplot(df, aes(x = var)) +
+        geom_histogram(bins = 50, fill = "steelblue", color = "black") +
+        labs(title = paste("Histogramme de", titre)) +
+        coord_cartesian(xlim = zoom_range(var)),
+
+      log_histogramme = ggplot(df, aes(x = log10(var))) +
+        geom_histogram(bins = 50, fill = "steelblue", color = "black") +
+        labs(title = paste("log10(", titre, ")")) +
+        coord_cartesian(xlim = zoom_range(log10(var))),
+
+      boxplot = ggplot(df, aes(y = var)) +
+        geom_boxplot(fill = "lightgreen") +
+        labs(title = paste("Boxplot de", titre)) +
+        coord_cartesian(ylim = zoom_range(var)) +
+        theme(axis.line.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.text.x = element_blank())
+    )
+  }
+
+  resumer_variable(cereales$vu)
+
+
+  visualiser_distribution(cereales$vu, "Valeur unitaire")
+
+
+  library(modeest)
+
+  vu_vals <- na.omit(cereales$vu)
+
+  mode_parzen     <- mlv(vu_vals, method = "parzen", bw = "nrd0")
+  mode_hsm        <- mlv(vu_vals, method = "hsm")
+  mode_shorth     <- mlv(vu_vals, method = "shorth")
+  mode_lientz <- mlv(vu_vals, method = "lientz", bw = 0.1)
+
+  mode_meanshift  <- mlv(vu_vals, method = "meanshift")
+
+  cat("Mode Parzen     :", mode_parzen, "\n")
+  cat("Mode HSM        :", mode_hsm, "\n")     # nous retenons ici le mode HSM
+  cat("Mode Shorth     :", mode_shorth, "\n")
+  cat("Mode Lientz     :", mode_lientz, "\n")
+  cat("Mode MeanShift  :", mode_meanshift, "\n")
+
+
+
+
+
+
+  # ---------------------------------------------------------------------------------------------
+  #### Construction de la Base Prix Unitaire
+  ###  2.1 Création de la Base VU
+
+  # 1. Filtrage des cas valides pour la base VU
+
+  vu_valides <- cereales %>%
+    filter(!is.na(vu),
+           dernier_achat %in% 1:3,
+           !is.na(unite_achat), !is.na(taille_achat),
+           !is.na(produit))
+
+  length(unique(paste(vu_valides$produit, cereales$unite_cons, cereales$taille_cons)))
+  length(unique(paste(vu_valides$produit, vu_valides$unite_achat, vu_valides$taille_achat)))
+  resumer_variable(vu_valides$vu)
+
+
+  # 2. Fonction mode HSM protégée
+  mode_hsm_safe <- function(x) {
+    x <- na.omit(x)
+    if (length(x) < 3) return(NA_real_)
+    tryCatch(suppressWarnings(mlv(x, method = "hsm")), error = function(e) NA_real_)
+  }
+
+  # 3. Construction de la base VU
+  baseVU <- vu_valides %>%
+    group_by(produit, unite_achat, taille_achat) %>%
+    summarise(
+      mediane_vu = median(vu, na.rm = TRUE),
+      mode_vu = mode_hsm_safe(vu),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      vu_ref = case_when(
+        is.na(mode_vu) ~ mediane_vu,  # si pas de mode, on garde la médiane
+        abs(mediane_vu - mode_vu) / mediane_vu < 0.10 ~ (mediane_vu + mode_vu) / 2,
+        TRUE ~ mediane_vu
+      )
+    ) %>%
+    select(produit, unite_achat, taille_achat, vu_ref)
+
+
+  colnames(baseVU) <- c(
+    "Produit","Unite", "Taille", "VU"
+  )
+
+
+
+  length(unique(paste(cereales$produit, cereales$unite_cons, cereales$taille_cons)))  # Total théorique
+
+  length(unique(paste(baseVU$Produit, baseVU$Unite, baseVU$Taille)))  # Ce que tu as
+
+  resumer_variable(baseVU$VU)
+
+
+  chemin_sortie <- "C:/Users/moust/Downloads/data/data/baseVU.csv"
+  write.csv(baseVU, chemin_sortie, row.names = FALSE)
+
+
+  #  2.2 Calcul des Dépenses de Consommation
+  triplets_cereales <- cereales %>%
+    distinct(produit, unite_cons, taille_cons)
+
+  triplets_VU <- baseVU %>%
+    distinct(Produit, Unite, Taille)
+
+  triplets_manquants <- anti_join(triplets_cereales,
+                                  triplets_VU,
+                                  by = c("produit" = "Produit",
+                                         "unite_cons" = "Unite",
+                                         "taille_cons" = "Taille"))
+  View(triplets_manquants)
+
+
+  baseVU <- baseVU %>%
+    rename(vu_ref = VU)
+
+
+  cereales <- cereales %>%
+    left_join(baseVU,
+              by = c("produit" = "Produit",
+                     "unite_cons" = "Unite",
+                     "taille_cons" = "Taille"))
+
+
+  cereales <- cereales %>%
+    mutate(valeur_consommee = ifelse(!is.na(qte_consommee) & !is.na(vu_ref),
+                                     qte_consommee * vu_ref,
+                                     NA_real_))
+
+  baseVU <- baseVU %>%
+    rename(VU = vu_ref)
+
+  #  2.3 Distinction par Source
+
+  cereales <- cereales %>%
+    mutate(
+      val_auto_cons = ifelse(!is.na(qte_autoconsommation) & !is.na(vu_ref), qte_autoconsommation * vu_ref, NA_real_),
+      val_don_cons  = ifelse(!is.na(qte_dons_troc) & !is.na(vu_ref), qte_dons_troc * vu_ref, NA_real_),
+      val_achat_cons = ifelse(!is.na(qte_consommee) & !is.na(qte_autoconsommation) & !is.na(qte_dons_troc) & !is.na(vu_ref), ( qte_consommee - qte_autoconsommation - qte_dons_troc )  * vu_ref, NA_real_)
+    )
+
+
+
+
+
+
+  # ---------------------------------------------------------------------------------------------
+  #### Conversion et Standardisation
+  ###   3.1 Utilisation de la Table de Conversion
+
+  names(TableConversionP2)
+
+  conversion <- TableConversionP2 %>%
+    rename(
+      produit = produitID,
+      unite_cons = uniteID,
+      taille_cons = tailleID
+    ) %>%
+    mutate(
+      poids = gsub(",", ".", poids),
+      poids = gsub(";", ".", poids),
+      poids = gsub("[^0-9\\.]", "", poids),
+      poids = as.numeric(poids),
+      poids_kg = poids / 1000
+    )
+
+
+
+  cereales <- cereales %>%
+    left_join(conversion,
+              by = c("produit", "unite_cons", "taille_cons"))
+
+
+  cereales <- cereales %>%
+    mutate(qte_kg = ifelse(!is.na(qte_consommee) & !is.na(poids_kg),
+                           qte_consommee * poids_kg,
+                           NA_real_))
+
+  ###   3.2 Variables Finales Requises
+
+
+  cereales <- cereales %>%
+    mutate(
+      frequence_achat = case_when(
+        dernier_achat == 1 ~ 7.0,
+        dernier_achat == 2 ~ 3.0,
+        dernier_achat == 3 ~ 1.0,
+        dernier_achat == 4 ~ 0.2,
+        dernier_achat == 5 ~ 0.0,
+        TRUE ~ NA_real_
+      )
+    )
+
+
+
+  Base_X1_SemiApuree <- cereales %>%
+    select(
+      menage_id,
+      produit,
+      unite_cons,
+      taille_cons,
+      qte_consommee,
+      valeur_consommee,
+      qte_kg,
+      val_achat_cons,
+      val_auto_cons,
+      val_don_cons,
+      frequence_achat
+    )
+
+
+
+
+
+
+  # ---------------------------------------------------------------------------------------------
+  ####  4. Nettoyage et Validation des Données
+  ###   4.1 Détection des Valeurs Aberrantes
+
+  analyser_variable_quantitative <- function(data, var_name) {
+    var <- data[[var_name]]
+
+    # Résumé statistique
+    print(summary(var))
+    cat("Écart-type :", sd(var, na.rm = TRUE), "\n")
+    cat("Nombre de NA :", sum(is.na(var)), "\n\n")
+
+    # Bornes IQR
+    q1 <- quantile(var, 0.25, na.rm = TRUE)
+    q3 <- quantile(var, 0.75, na.rm = TRUE)
+    iqr <- q3 - q1
+    borne_inf <- q1 - 1.5 * iqr
+    borne_sup <- q3 + 1.5 * iqr
+
+    cat("Borne inférieure :", borne_inf, "\n")
+    cat("Borne supérieure :", borne_sup, "\n\n")
+
+    # Nombre d'outliers
+    n_outliers <- sum(var < borne_inf | var > borne_sup, na.rm = TRUE)
+    pct_outliers <- round(n_outliers / sum(!is.na(var)) * 100, 2)
+    cat("Nombre d'outliers :", n_outliers, "(", pct_outliers, "%)\n\n")
+
+    # Histogramme
+    hist(var, main = paste("Histogramme de", var_name), xlab = var_name, col = "lightblue", breaks = 50)
+
+    # Boxplot zoomé
+    ggplot(data, aes_string(y = var_name)) +
+      geom_boxplot(fill = "lightgreen") +
+      labs(title = paste("Boxplot de", var_name), y = var_name) +
+      coord_cartesian(ylim = quantile(var, probs = c(0.01, 0.99), na.rm = TRUE)) +
+      theme_minimal() +
+      theme(
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank()
+      )
+  }
+
+
+
+  corriger_variable_quantitative <- function(data, var_name, seuil_inf_0 = TRUE) {
+    var <- data[[var_name]]
+
+    q1 <- quantile(var, 0.25, na.rm = TRUE)
+    q3 <- quantile(var, 0.75, na.rm = TRUE)
+    iqr <- q3 - q1
+    borne_inf <- q1 - 1.5 * iqr
+    borne_sup <- q3 + 1.5 * iqr
+
+    if (seuil_inf_0) {
+      borne_inf <- max(borne_inf, 0)
+    }
+
+    var_corr <- ifelse(var < borne_inf, borne_inf,
+                       ifelse(var > borne_sup, borne_sup, var))
+
+    data[[var_name]] <- var_corr  # On remplace directement la variable
+    return(data)
+  }
+
+
+
+  # qte_kg
+
+
+  analyser_variable_quantitative(Base_X1_SemiApuree, "qte_kg")
+
+  Base_X1_SemiApuree <- corriger_variable_quantitative(Base_X1_SemiApuree, "qte_kg")
+
+  analyser_variable_quantitative(Base_X1_SemiApuree, "qte_kg")
+
+
+  # valeur_consommee
+
+
+  analyser_variable_quantitative(Base_X1_SemiApuree, "valeur_consommee")
+
+  Base_X1_SemiApuree <- corriger_variable_quantitative(Base_X1_SemiApuree, "valeur_consommee")
+
+  analyser_variable_quantitative(Base_X1_SemiApuree, "valeur_consommee")
+
+  # on recalcule la val_achat_cons
+
+  Base_X1_SemiApuree$val_achat_cons <- Base_X1_SemiApuree$valeur_consommee - Base_X1_SemiApuree$val_auto_cons - Base_X1_SemiApuree$val_don_cons
+
+
+  # Méthode de correction : la winsorisation #
+
+
+
+
+  ###   4.2 Validation par les Kilocalories
+
+  conversion_cal <- calorie_conversion_tgo2021 %>%
+    transmute(
+      produit = as.numeric(codpr),         # S'assurer que c’est bien numérique
+      kcal_par_kg = cal * 10               # Convertir les 100g en kg (=> kcal/kg)
+    )
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    mutate(produit = as.numeric(produit)) %>%  # au cas où c’est un facteur
+    left_join(conversion_cal, by = "produit")
+
+
+  summary(Base_X1_SemiApuree$kcal_par_kg)
+  sum(is.na(Base_X1_SemiApuree$kcal_par_kg))   # nombre de produits non appariés
+
+
+  Base_X1_SemiApuree %>%
+    filter(is.na(kcal_par_kg)) %>%
+    distinct(produit)
+
+
+  unique(conversion_cal$produit)
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    mutate(kcal = qte_kg * kcal_par_kg)
+
+
+  S00_S01_membres <- S00_S01_membres %>%
+    mutate(ifmember = ifelse(s01q12 == 1 | s01q13 == 1, 1, 0)) %>%
+    rename(menage_id = interview__key)
+
+  taille_menage <- S00_S01_membres %>%
+    group_by(menage_id) %>%
+    summarise(nb_personnes = sum(ifmember, na.rm = TRUE), .groups = "drop")
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    left_join(taille_menage, by = "menage_id")
+
+
+  kcal_menage <- Base_X1_SemiApuree %>%
+    group_by(menage_id) %>%
+    summarise(kcal_total = sum(kcal, na.rm = TRUE), .groups = "drop")
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    left_join(kcal_menage, by = "menage_id")
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    mutate(kcal_par_tete = kcal_total / (7 * nb_personnes))
+
+
+
+  Base_X1_SemiApuree <- Base_X1_SemiApuree %>%
+    mutate(
+      indice_kcal = kcal_par_tete / 2400,
+      ecart_relatif = (kcal_par_tete - 2400) / 2400,
+      statut_kcal = case_when(
+        is.na(indice_kcal) ~ NA_character_,
+        indice_kcal < 1 & ecart_relatif < -0.2 ~ "aberrante sous le seuil",
+        indice_kcal < 1 & ecart_relatif >= -0.2 ~ "normal sous le seuil",
+        indice_kcal > 1 & ecart_relatif > 0.2 ~ "aberrante au dessus du seuil",
+        indice_kcal > 1 & ecart_relatif <= 0.2 ~ "normal au dessus du seuil"
+      )
+    )
+
+
+
+
+  # Total sans NA
+  total_obs <- Base_X1_SemiApuree %>%
+    filter(!is.na(kcal_par_tete)) %>%
+    nrow()
+
+  # Nombre de valeurs aberrantes
+  aberrantes <- Base_X1_SemiApuree %>%
+    filter(!is.na(kcal_par_tete)) %>%
+    filter(kcal_par_tete < 1920 | kcal_par_tete > 2880) %>%
+    nrow()
+
+  # Pourcentage
+  pourcentage_aberrantes <- round((aberrantes / total_obs) * 100, 2)
+
+  # Affichage
+  cat("Pourcentage de valeurs aberrantes :", pourcentage_aberrantes, "%\n") ## 89.99 % ( seuil problématique )
+
+
+
+
+
+
+
+
+  ### 4.3 Enrichissement des Données
+
+  infos_geo <- Ehcvm_all %>%
+    select(
+      menage_id = interview__key,
+      region = s00q01,
+      departement = s00q02,
+      milieu = s00q04
+    ) %>%
+    distinct()
+
+  Base_X1_Apuree <- Base_X1_SemiApuree %>%
+    left_join(infos_geo, by = "menage_id")
+
+
+  unique(Base_X1_Apuree$region)
+  unique(Base_X1_Apuree$departement)
+  unique(Base_X1_Apuree$milieu)
+
+  labels_region <- c(
+    DAKAR = 1, ZIGUINCHOR = 2, DIOURBEL = 3, "SAINT-LOUIS" = 4,
+    TAMBACOUNDA = 5, KAOLACK = 6, THIES = 7, LOUGA = 8,
+    FATICK = 9, KOLDA = 10, MATAM = 11, KAFFRINE = 12,
+    KEDOUGOU = 13, SEDHIOU = 14
+  )
+
+  labels_departement <- c(
+    DAKAR = 11, PIKINE = 12, RUFISQUE = 13, GUEDIAWAYE = 14,
+    BIGNONA = 21, OUSSOUYE = 22, ZIGUINCHOR = 23,
+    BAMBEY = 31, DIOURBEL = 32, M_BACKE = 33,
+    DAGANA = 41, PODOR = 42, "SAINT LOUIS" = 43,
+    BAKEL = 51, TAMBACOUNDA = 52, GOUDIRY = 53, KOUPENTOUM = 54,
+    KAOLACK = 61, NIORO = 62, GUINGUINEO = 63,
+    M_BOUR = 71, THIES = 72, TIVAOUANE = 73,
+    KEBEMER = 81, LINGUERE = 82, LOUGA = 83,
+    FATICK = 91, FOUNDIOUGNE = 92, GOSSAS = 93,
+    KOLDA = 101, VELINGARA = 102, MEDINA_YORO_FOULAH = 103,
+    MATAM = 111, KANEL = 112, RANEROU = 113,
+    KAFFRINE = 121, BIRKELANE = 122, KOUNGHEUL = 123,
+    MALEM_HODDAR = 124,
+    KEDOUGOU = 131, SALEMATA = 132, SARAYA = 133,
+    SEDHIOU = 141, BOUNKILING = 142, GOUDOMP = 143
+  )
+
+  labels_milieu <- c(
+    Urbain = 1, Rural = 2
+  )
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    mutate(
+      region = set_value_labels(region, labels = labels_region),
+      departement = set_value_labels(departement, labels = labels_departement),
+      milieu = set_value_labels(milieu, labels = labels_milieu)
+    )
+
+
+
+  chemin_sortie <- "C:/Users/moust/Downloads/data/data/Base_X1_Apuree.csv"
+  write.csv(Base_X1_Apuree, chemin_sortie, row.names = FALSE)
+
+
+  # ---------------------------------------------------------------------------------------------
+  #### Gestions des valeurs manquantes
+
+
+  sapply(Base_X1_Apuree[], function(x) mean(is.na(x)) * 100)
+
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    filter(!menage_id %in% verifications[["declaration_incomplete"]][["menage_id"]])
+
+
+  sapply(Base_X1_Apuree[], function(x) mean(is.na(x)) * 100)
+
+
+  geo_na <- Base_X1_Apuree %>%
+    filter(is.na(region) | is.na(departement) | is.na(milieu))
+
+  menages_absents <- geo_na$menage_id[!geo_na$menage_id %in% Ehcvm_all$interview__key]
+
+  length(menages_absents)  # → Nombre de ménages réellement absents de la table source
+
+
+  infos_geo_na <- Ehcvm_all %>%
+    select(menage_id = interview__key, region = s00q01, departement = s00q02, milieu = s00q04) %>%
+    filter(is.na(region) | is.na(departement) | is.na(milieu))
+
+
+  nrow(infos_geo_na)
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    mutate(
+      achat_non_applicable = ifelse(is.na(val_achat_cons) & frequence_achat == 0, TRUE, FALSE),
+      achat_manquant = ifelse(is.na(val_achat_cons) & frequence_achat > 0, TRUE, FALSE)
+    )
+
+
+
+
+  sapply(Base_X1_Apuree[], function(x) mean(is.na(x)) * 100)
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    mutate(
+      val_achat_cons = ifelse(is.na(val_achat_cons) & frequence_achat == 0, 0, val_achat_cons),
+      val_auto_cons = ifelse(is.na(val_auto_cons) , 0, val_auto_cons),
+      val_don_cons = ifelse(is.na(val_don_cons) , 0, val_don_cons)
+    )
+
+
+  Base_X1_Apuree$achat_non_applicable <- NULL
+  Base_X1_Apuree$achat_manquant <- NULL
+
+
+  library(VIM)
+
+  vars_explicatives <- c("produit", "unite_cons", "taille_cons",
+                         "nb_personnes", "qte_kg", "frequence_achat",
+                         "region", "departement", "milieu")
+
+  df_impute <- Base_X1_Apuree %>%
+    select(all_of(c("valeur_consommee", "kcal", vars_explicatives))) %>%
+    mutate(across(c(produit, unite_cons, taille_cons, region, departement, milieu), as.factor))
+
+  df_imputed <- kNN(
+    df_impute,
+    variable = c("valeur_consommee", "kcal"),
+    dist_var = vars_explicatives,
+    k = 5
+  )
+
+
+
+  Base_X1_Apuree$valeur_consommee <- df_imputed$valeur_consommee
+  Base_X1_Apuree$kcal <- df_imputed$kcal
+  Base_X1_Apuree$val_achat_cons <- Base_X1_Apuree$valeur_consommee - Base_X1_Apuree$val_don_cons - Base_X1_Apuree$val_auto_cons
+
+  table_kcal <- Base_X1_Apuree %>%
+    group_by(menage_id) %>%
+    summarise(
+      kcal_total = sum(kcal, na.rm = TRUE),
+      nb_personnes = first(nb_personnes),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      kcal_par_tete = kcal_total / (7 * nb_personnes),
+      ecart_relatif = ( kcal_par_tete - 2400 ) / 2400,
+      indice_kcal = kcal_par_tete / 2400,
+      statut_kcal = case_when(
+        is.na(indice_kcal) ~ NA_character_,
+        indice_kcal < 1 ~ "Sous le seuil",
+        TRUE ~ "Au dessus du seuil"
+      )
+    )
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    select(-kcal_total, -kcal_par_tete, -nb_personnes)
+
+  Base_X1_Apuree$kcal_par_tete <- NULL
+  Base_X1_Apuree$ecart_relatif <- NULL
+  Base_X1_Apuree$indice_kcal <- NULL
+  Base_X1_Apuree$statut_kcal <- NULL
+
+  Base_X1_Apuree <- Base_X1_Apuree %>%
+    left_join(table_kcal, by = "menage_id")
+
+
+  sapply(Base_X1_Apuree[], function(x) mean(is.na(x)) * 100)
+
+  library(labelled)
+
+  var_label(Base_X1_Apuree$valeur_consommee)     <- "Valeur estimée de la consommation (en FCFA)"
+  var_label(Base_X1_Apuree$qte_kg)               <- "Quantité consommée (en kilogrammes)"
+  var_label(Base_X1_Apuree$val_achat_cons)       <- "Valeur des achats de céréales (en FCFA)"
+  var_label(Base_X1_Apuree$val_auto_cons)        <- "Valeur de l'autoconsommation de céréales (en FCFA)"
+  var_label(Base_X1_Apuree$val_don_cons)         <- "Valeur des dons/trocs de céréales (en FCFA)"
+  var_label(Base_X1_Apuree$frequence_achat)      <- "Fréquence d'achat du produit pendant la période"
+  var_label(Base_X1_Apuree$kcal_par_kg)          <- "Apport calorique par kilogramme (kcal/kg)"
+  var_label(Base_X1_Apuree$kcal)                 <- "Apport calorique total de la quatitée consommée (en kcal)"
+  var_label(Base_X1_Apuree$region)               <- "Région de résidence du ménage"
+  var_label(Base_X1_Apuree$departement)          <- "Département de résidence du ménage"
+  var_label(Base_X1_Apuree$milieu)               <- "Milieu de résidence (Urbain ou Rural)"
+  var_label(Base_X1_Apuree$kcal_total)           <- "Apport calorique total du ménage sur 7 jours (en kcal)"
+  var_label(Base_X1_Apuree$nb_personnes)         <- "Nombre de personnes dans le ménage"
+  var_label(Base_X1_Apuree$kcal_par_tete)        <- "Apport calorique moyen par personne sur les 7 dernier jours (kcal/personne)"
+  var_label(Base_X1_Apuree$indice_kcal)          <- "Rapport entre kcal_par_tete et le seuil de 2400"
+  var_label(Base_X1_Apuree$ecart_relatif)        <- "Ecart relatif entre kcal_par_tete et le seuil"
+  var_label(Base_X1_Apuree$indice_kcal)          <- "Indice par rapport au seuil de 2400 kcal/jour/personne"
+  var_label(Base_X1_Apuree$statut_kcal)          <- "Statut nutritionnel du ménage (en dessous ou au-dessus du seuil)"
+
+
+
+
+  chemin_sortie <- "C:/Users/moust/Downloads/data/data/Base_X1_Apuree.csv"
+  write.csv(Base_X1_Apuree, chemin_sortie, row.names = FALSE)
+
+
+
+
+
+
+  # ---------------------------------------------------------------------------------------------
+  ####   5. Analyses Statistiques
+
+  # Chargement du package nécessaire
+  library(dplyr)
+
+  # Création de la base ménage
+  Base_menage <- Base_X1_Apuree %>%
+    group_by(menage_id) %>%
+    summarise(
+      # --- Données nutritionnelles et de consommation ---
+      kcal_total = first(kcal_total),                # déjà au niveau ménage
+      nb_personnes = first(nb_personnes),            # taille du ménage
+      kcal_par_tete = first(kcal_par_tete),          # kcal moyen/personne
+      indice_kcal = first(indice_kcal),              # indice kcal
+      ecart_relatif = first(ecart_relatif),          # écart relatif au seuil
+      statut_kcal = first(statut_kcal),              # statut nutritionnel
+
+      # --- Valeurs monétaires totales (somme sur les produits) ---
+      total_valeur_consommee = sum(valeur_consommee, na.rm = TRUE),
+      total_val_achat = sum(val_achat_cons, na.rm = TRUE),
+      total_val_auto = sum(val_auto_cons, na.rm = TRUE),
+      total_val_don = sum(val_don_cons, na.rm = TRUE),
+
+      # --- Diversité alimentaire ---
+      nb_produits = n_distinct(produit),             # diversité de produits
+
+      # --- Localisation (invariables au sein du ménage) ---
+      region = first(region),
+      departement = first(departement),
+      milieu = first(milieu)
+    ) %>%
+    ungroup()
+
+
+
+  library(labelled)
+
+  var_label(Base_menage$menage_id)              <- "Identifiant unique du ménage"
+  var_label(Base_menage$kcal_total)             <- "Apport calorique total du ménage sur les 7 derniers jours (kcal)"
+  var_label(Base_menage$nb_personnes)           <- "Nombre de personnes dans le ménage"
+  var_label(Base_menage$kcal_par_tete)          <- "Apport calorique moyen par personne par jour (sur sur les 7 derniers jours)"
+  var_label(Base_menage$indice_kcal)            <- "Indice par rapport au seuil de 2400 kcal/jour/personne"
+  var_label(Base_menage$ecart_relatif)          <- "Écart relatif au seuil de 2400 kcal/jour/personne"
+  var_label(Base_menage$statut_kcal)            <- "Statut nutritionnel (sous ou au-dessus du seuil)"
+  var_label(Base_menage$total_valeur_consommee) <- "Valeur totale de la consommation alimentaire (FCFA) sur les 7 derniers jours"
+  var_label(Base_menage$total_val_achat)        <- "Valeur totale des achats alimentaires (FCFA) sur les 7 derniers jours"
+  var_label(Base_menage$total_val_auto)         <- "Valeur totale de l'autoconsommation (FCFA) sur les 7 derniers jours"
+  var_label(Base_menage$total_val_don)          <- "Valeur totale des dons alimentaires (FCFA) sur les 7 derniers jours"
+  var_label(Base_menage$nb_produits)            <- "Nombre de produits alimentaires différents consommés sur les 7 derniers jours"
+  var_label(Base_menage$region)                 <- "Région de résidence du ménage"
+  var_label(Base_menage$departement)            <- "Département de résidence du ménage"
+  var_label(Base_menage$milieu)                 <- "Milieu de résidence (urbain/rural)"
+
+
+  chemin_sortie_csv <- "C:/Users/moust/Downloads/data/data/Base_menage.csv"
+  write.csv(Base_menage, file = chemin_sortie_csv, row.names = FALSE, fileEncoding = "UTF-8")
+
+
+
+
+
+
+  ###    5.1 Analyses Descriptives
+
+  # Charger les packages nécessaires
+  library(haven)    # Pour lire les fichiers .dta
+  library(dplyr)    # Pour manipuler les données
+  
+  # 1. Charger la base
+  # Remplace le chemin par celui de ton fichier .dta si nécessaire
+  df <- read_csv("C:/Users/moust/Downloads/data/data/Base_X1_Apuree.csv")
+  
+  # 2. Vérifier les colonnes disponibles
+  print(names(df))
+  
+  # Supposons que :
+  # - la colonne de la région s'appelle "NOMREG"
+  # - la colonne de la quantité consommée s'appelle "qte_conso"
+  
+  # Si les noms sont différents, remplace-les dans le code ci-dessous
+  
+  # 3. Regrouper les données par région et sommer les quantités
+  df_region <- df %>%
+    group_by(region) %>%
+    summarise(quantite = sum(qte_consommee, na.rm = TRUE)) %>%
+    ungroup()
+  
+  # 4. Afficher un aperçu du résultat
+  print(df_region)
+  
+  chemin_sortie_csv <- "C:/Users/moust/Downloads/data/data/qte_consommee.csv"
+  write.csv(df_region, file = chemin_sortie_csv, row.names = FALSE, fileEncoding = "UTF-8")
+
+  # Charger les bibliothèques nécessaires
+  library(dplyr)
+  
+  # Lire le fichier CSV
+  base_menage <- read.csv("C:/Users/moust/Downloads/Base_menage.csv")
+  
+  # Identifier les colonnes numériques (exclure les colonnes d'identifiant)
+  colonnes_numeriques <- sapply(base_menage, is.numeric)
+  colonnes_numeriques <- names(colonnes_numeriques[colonnes_numeriques == TRUE])
+  
+  # Exclure les colonnes d'identifiant si elles sont numériques
+  colonnes_a_exclure <- c("menage_id", "region", "nb_personnes")  # ajustez selon vos noms de colonnes
+  colonnes_numeriques <- setdiff(colonnes_numeriques, colonnes_a_exclure)
+  
+  # Fonction pour calculer la moyenne pondérée
+  moyenne_ponderee <- function(x, poids) {
+    if(all(is.na(x)) || all(is.na(poids)) || sum(poids, na.rm = TRUE) == 0) {
+      return(NA)
+    }
+    return(sum(x * poids, na.rm = TRUE) / sum(poids, na.rm = TRUE))
+  }
+  
+  # Calculer les moyennes pondérées par région
+  resultats <- base_menage %>%
+    group_by(region) %>%
+    summarise(
+      across(all_of(colonnes_numeriques), 
+             ~ moyenne_ponderee(.x, nb_personnes),
+             .names = "moy_pond_{.col}"),
+      nb_menages = n(),
+      taille_totale = sum(nb_personnes, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # Afficher les résultats
+  print(resultats)
+  
+  # Optionnel : sauvegarder les résultats
+  write.csv(resultats, "moyennes_ponderees_par_region.csv", row.names = FALSE)  
+  
+  
+  
+  
+  qte_consommee <- read.csv(paste0(chemin, "/qte_consommee.csv"))
+  
+  
+  # Données ménage individuelles
+  data_menages <- read.csv("C:/Users/moust/Downloads/Base_menage.csv")
+  
+  # Shapefile déjà lu
+  regions_sf <- st_read("C:/Users/moust/Downloads/data/data/Limite_Région.shp")
+  
+  # Appel de la fonction
+  plot_map(data_menages, regions_sf, var = "total_valeur_consommee", region_col = "region", poids = "nb_personnes")
+  
+  
+  
+  
